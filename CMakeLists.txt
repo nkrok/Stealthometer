@@ -16,7 +16,11 @@ include("${CMAKE_BINARY_DIR}/CMakeRC.cmake")
 set(CMAKE_CXX_STANDARD 23)
 
 #create_resources("data" "src/resources.c")
-cmrc_add_resource_library(stealthometer-resources NAMESPACE stealthometer ALIAS stealthometer::rc "data/repo.json")
+cmrc_add_resource_library(stealthometer-resources NAMESPACE stealthometer ALIAS stealthometer::rc
+ "data/repo.json"
+ "data/SA-OK.png"
+ "data/SA-Fail.png"
+ "data/SA-Redeemable.png")
 
 # Create the Stealthometer mod library.
 add_library(Stealthometer SHARED
@@ -26,7 +30,7 @@ add_library(Stealthometer SHARED
  "src/Rating.h" "src/Rating.cpp" "src/PlayStyleRating.h" "src/util.h" "src/Events.h" "src/EventSystem.h" "src/EventSystem.cpp" "src/Enums.h"
  "src/deps/imgui/imgui_stdlib.h"
  "src/deps/imgui/imgui_stdlib.cpp"
- "src/LiveSplitClient.h" "src/LiveSplitClient.cpp" "src/RunData.h")
+ "src/LiveSplitClient.h" "src/LiveSplitClient.cpp" "src/RunData.h" "src/HudIcon.cpp" "src/HudIcon.h")
 
 
 find_package(directx-headers CONFIG REQUIRED)

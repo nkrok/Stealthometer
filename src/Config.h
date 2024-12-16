@@ -18,10 +18,12 @@ struct ConfigData
 	bool externalWindowOnTop = false;
 	bool inGameOverlay = false;
 	bool inGameOverlayDetailed = false;
+	bool hudIcon = false;
 	DockMode overlayDockMode = DockMode::None;
 	bool liveSplitEnabled = false;
 	std::string liveSplitIP = "127.0.0.1";
 	uint16_t liveSplitPort = 16834;
+	int freelancerSA = 0;
 };
 
 class Config
@@ -36,6 +38,7 @@ public:
 		data.externalWindowOnTop = plugin.GetSettingBool("general", "external_window_on_top", data.externalWindowOnTop);
 		data.inGameOverlay = plugin.GetSettingBool("general", "overlay", data.inGameOverlay);
 		data.inGameOverlayDetailed = plugin.GetSettingBool("general", "overlay_detailed", data.inGameOverlayDetailed);
+		data.hudIcon = plugin.GetSettingBool("general", "hud_icon", data.hudIcon);
 		data.liveSplitEnabled = plugin.GetSettingBool("livesplit", "enabled", data.liveSplitEnabled);
 		data.liveSplitIP = plugin.GetSetting("livesplit", "ip", data.liveSplitIP);
 		data.liveSplitPort = plugin.GetSettingInt("livesplit", "port", data.liveSplitPort);
@@ -47,6 +50,8 @@ public:
 		else if (overlayDock == "bottomleft") data.overlayDockMode = DockMode::BottomLeft;
 		else if (overlayDock == "bottomright") data.overlayDockMode = DockMode::BottomRight;
 		else data.overlayDockMode = DockMode::None;
+
+		data.freelancerSA = plugin.GetSettingInt("freelancer", "sa_status", data.freelancerSA);
 	}
 
 	void Save() {
@@ -60,6 +65,7 @@ public:
 		plugin.SetSettingBool("general", "external_window_on_top", data.externalWindowOnTop);
 		plugin.SetSettingBool("general", "overlay", data.inGameOverlay);
 		plugin.SetSettingBool("general", "overlay_detailed", data.inGameOverlayDetailed);
+		plugin.SetSettingBool("general", "hud_icon", data.hudIcon);
 		plugin.SetSettingBool("livesplit", "enabled", data.liveSplitEnabled);
 		plugin.SetSetting("livesplit", "ip", data.liveSplitIP);
 		plugin.SetSettingInt("livesplit", "port", data.liveSplitPort);
@@ -80,6 +86,8 @@ public:
 			break;
 		}
 		plugin.SetSetting("general", "overlay_dock", spinOverlayDock);
+
+		plugin.SetSettingInt("freelancer", "sa_status", data.freelancerSA);
 	}
 
 	inline ConfigData& Get() { return data; }

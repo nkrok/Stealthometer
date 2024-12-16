@@ -13,6 +13,7 @@
 #include "RunData.h"
 #include "Stats.h"
 #include "StatWindow.h"
+#include "HudIcon.h"
 #include "util.h"
 
 struct ActorData
@@ -64,12 +65,14 @@ private:
 	//DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZGameStatsManager_SendAISignals, ZGameStatsManager* th);
 	DECLARE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent, ZAchievementManagerSimple* th, uint32_t eventIndex, const ZDynamicObject& ev);
 	DECLARE_PLUGIN_DETOUR(Stealthometer, void*, OnLoadingScreenActivated, void* th, void* a1);
+	DECLARE_PLUGIN_DETOUR(Stealthometer, void, OnClearScene, ZEntitySceneContext* sceneContext, bool forReload);
 
 private:
 	SRWLOCK eventLock = {};
 	Stats stats;
 	DisplayStats displayStats;
 	StatWindow window;
+	HudIcon hudIcon;
 	EventSystem events;
 	Config config;
 	LiveSplitClient liveSplitClient;
@@ -80,7 +83,7 @@ private:
 	std::unordered_map<std::string, nlohmann::json, StringHashLowercase, InsensitiveCompare> repo;
 
 	RunData runData;
-	FreelancerRunData freelancer;
+	//FreelancerRunData freelancer;
 
 	int npcCount = 0;
 	double cutsceneEndTime = 0;
@@ -103,6 +106,8 @@ private:
 	bool isLoadingScreenCheckHasBeenTrue = false;
 	bool loadingScreenActivated = false;
 	bool startAfterLoad = false;
+
+	int showHudIcon = 0;
 };
 
 DEFINE_ZHM_PLUGIN(Stealthometer)

@@ -95,6 +95,7 @@ auto Stealthometer::InstallHooks() -> void {
 
 	Hooks::ZLoadingScreenVideo_ActivateLoadingScreen->AddDetour(this, &Stealthometer::OnLoadingScreenActivated);
 	Hooks::ZAchievementManagerSimple_OnEventSent->AddDetour(this, &Stealthometer::ZAchievementManagerSimple_OnEventSent);
+	Hooks::ZEntitySceneContext_ClearScene->AddDetour(this, &Stealthometer::OnClearScene);
 
 	this->hooksInstalled = true;
 }
@@ -110,6 +111,7 @@ auto Stealthometer::UninstallHooks() -> void {
 
 	Hooks::ZLoadingScreenVideo_ActivateLoadingScreen->RemoveDetour(&Stealthometer::OnLoadingScreenActivated);
 	Hooks::ZAchievementManagerSimple_OnEventSent->RemoveDetour(&Stealthometer::ZAchievementManagerSimple_OnEventSent);
+	Hooks::ZEntitySceneContext_ClearScene->RemoveDetour(&Stealthometer::OnClearScene);
 
 	this->hooksInstalled = false;
 }
@@ -124,6 +126,11 @@ auto Stealthometer::OnEngineInitialized() -> void
 
 	if (config.Get().liveSplitEnabled)
 		this->liveSplitClient.start();
+
+	if (config.Get().hudIcon)
+		hudIcon.create(hInstance, cmrc::stealthometer::get_filesystem(), 0, SilentAssassinStatus::OK);
+
+	runData.freelancer.sa = static_cast<SilentAssassinStatus>(config.Get().freelancerSA);
 }
 
 auto Stealthometer::IsRepoIdTargetNPC(const std::string& id) const -> bool {
@@ -331,6 +338,15 @@ auto Stealthometer::DrawSettingsUI(bool focused) -> void {
 
 		if (ImGui::Checkbox("External Window On Top", &cfg.externalWindowOnTop)) {
 			this->window.setAlwaysOnTop(cfg.externalWindowOnTop);
+			config.Save();
+		}
+
+		if (ImGui::Checkbox("HUD Icon", &cfg.hudIcon)) {
+			if (cfg.hudIcon)
+				hudIcon.create(hInstance, cmrc::stealthometer::get_filesystem(), showHudIcon, displayStats.silentAssassin);
+			else
+				hudIcon.destroy();
+
 			config.Save();
 		}
 
@@ -890,6 +906,8 @@ auto Stealthometer::UpdateDisplayStats() -> void {
 	if (this->displayStats.silentAssassin != sa) {
 		this->displayStats.silentAssassin = sa;
 		updated = true;
+
+		hudIcon.update(showHudIcon, sa);
 	}
 
 	// Stealth Rating
@@ -958,12 +976,16 @@ auto Stealthometer::SetupEvents() -> void {
 		stats.bodies.foundMurderedInfos.try_emplace(ev.bodyId, std::move(bodyFoundInfo));
 	};
 	events.listen<Events::EvergreenCampaignActivated>([this](const ServerEvent<Events::EvergreenCampaignActivated>& ev) {
-		if (!this->freelancer.campaignInProgress)
+		if (!this->runData.freelancer.campaignInProgress)
 			this->liveSplitClient.send(eClientMessage::Reset);
+
+			this->runData.freelancer.sa = SilentAssassinStatus::OK;
+			config.Get().freelancerSA = std::to_underlying(SilentAssassinStatus::OK);
+			config.Save();
 
 		this->liveSplitClient.send(eClientMessage::StartOrSplit);
 
-		this->freelancer.campaignCompleted = false;
+		this->runData.freelancer.campaignCompleted = false;
 	});
 	events.listen<Events::ScoringScreenEndState_CampaignCompleted>([this](const ServerEvent<Events::ScoringScreenEndState_CampaignCompleted>& ev) {
 		this->liveSplitClient.send(eClientMessage::Split);
@@ -985,16 +1007,42 @@ auto Stealthometer::SetupEvents() -> void {
 			this->liveSplitClient.send(eClientMessage::StartTimer);
 		Logger::Info("ContractStart: {}", ev.json.dump());
 		this->NewContract();
-	});
+
+		if (ev.Value.LocationId == "LOCATION_SNUG") showHudIcon = 2;
+		else showHudIcon = 1;
+		hudIcon.update(showHudIcon, displayStats.silentAssassin);
+;	});
 	events.listen<Events::ContractLoad>([this](auto& ev) {
 		this->NewContract();
+		showHudIcon = 1;
+		hudIcon.update(showHudIcon, displayStats.silentAssassin);
 	});
 	events.listen<Events::ContractEnd>([this](const ServerEvent<Events::ContractEnd>& ev) {
 		if (this->IsContractEnded()) return;
 		this->missionEndTime = ev.Timestamp;
+
+		showHudIcon = 0;
+		hudIcon.update(showHudIcon, displayStats.silentAssassin);
+
+		if (this->runData.missionType == MissionType::Evergreen) {
+			if (this->runData.freelancer.sa != SilentAssassinStatus::Fail && this->displayStats.silentAssassin != SilentAssassinStatus::OK)
+			{
+				this->runData.freelancer.sa = SilentAssassinStatus::Fail;
+				config.Get().freelancerSA = std::to_underlying(SilentAssassinStatus::Fail);
+				config.Save();
+			}
+		}
 	});
 	events.listen<Events::ExitGate>([this](const ServerEvent<Events::ExitGate>& ev) {
-		if (this->runData.missionType != MissionType::Evergreen) {
+		if (this->runData.missionType == MissionType::Evergreen) {
+			if (this->runData.freelancer.sa != SilentAssassinStatus::Fail && this->displayStats.silentAssassin != SilentAssassinStatus::OK)
+			{
+				this->runData.freelancer.sa = SilentAssassinStatus::Fail;
+				config.Get().freelancerSA = std::to_underlying(SilentAssassinStatus::Fail);
+				config.Save();
+			}
+		}
+		else {
 			this->liveSplitClient.pause();
 			this->liveSplitClient.send(eClientMessage::SetGameTime, {std::to_string(ev.Timestamp)});
 			this->liveSplitClient.send(eClientMessage::Split);
@@ -1002,6 +1050,9 @@ auto Stealthometer::SetupEvents() -> void {
 		}
 
 		this->missionEndTime = ev.Timestamp;
+
+		showHudIcon = 0;
+		hudIcon.update(showHudIcon, displayStats.silentAssassin);
 	});
 	events.listen<Events::IntroCutEnd>([this](const ServerEvent<Events::IntroCutEnd>& ev) {
 		this->cutsceneEndTime = ev.Timestamp;
@@ -1616,6 +1667,13 @@ DEFINE_PLUGIN_DETOUR(Stealthometer, void, ZAchievementManagerSimple_OnEventSent,
 		Logger::Error("{}", eventData);
 	}
 
+	return HookResult<void>(HookAction::Continue());
+}
+
+DEFINE_PLUGIN_DETOUR(Stealthometer, void, OnClearScene, ZEntitySceneContext* sceneContext, bool forReload)
+{
+	showHudIcon = 0;
+	hudIcon.update(showHudIcon, displayStats.silentAssassin);
 	return HookResult<void>(HookAction::Continue());
 }
 

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Stats.h"
+
 enum class FreelancerCampaignStage {
 	FirstSyndicate,
 	SecondSyndicate,
@@ -14,6 +16,8 @@ struct FreelancerRunData
 	bool noSyndicateActive = false;
 	bool campaignInProgress = false;
 	bool campaignCompleted = false;
+
+	SilentAssassinStatus sa = SilentAssassinStatus::OK;
 };
 
 struct RunData
